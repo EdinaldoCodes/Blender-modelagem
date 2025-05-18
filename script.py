@@ -313,96 +313,142 @@ def criar_mesa_sinuca_completa(
 ):
     """Cria a mesa de sinuca completa com todos os componentes e parâmetros ajustáveis."""
     limpar_cena()
-    mesa_pai = criar_objeto_pai(
-        "MesaSinuca_Raiz",
-        (posicao_mesa_global_xyz[0], posicao_mesa_global_xyz[1], 0)
-    )
-    z_ref_feltro = posicao_mesa_global_xyz[2]
+    # Cria todos os objetos SEM parentesco
     objetos_criados = {"pernas": [], "bordas": [], "bolsos": [], "bolas": []}
-
+    z_ref_feltro = posicao_mesa_global_xyz[2]
     z_centro_base_mesa = z_ref_feltro - (altura_base_estrutura / 2)
     objetos_criados["base"] = criar_base_mesa(
         comprimento_total_estrutura, largura_total_estrutura, altura_base_estrutura,
-        z_centro_base_mesa, "Mesa_BaseEstrutura", mesa_pai
+        z_centro_base_mesa, "Mesa_BaseEstrutura", None
     )
     objetos_criados["feltro"] = criar_superficie_jogo(
         comprimento_area_jogo, largura_area_jogo,
-        z_ref_feltro, "Mesa_Feltro", mesa_pai
+        z_ref_feltro, "Mesa_Feltro", None
     )
     z_topo_pernas = z_ref_feltro - altura_base_estrutura
     objetos_criados["pernas"] = criar_pernas_mesa(
         comprimento_total_estrutura, largura_total_estrutura,
         diametro_perna, altura_pernas_chao_a_base,
         z_topo_pernas, afastamento_pernas_x_ratio, afastamento_pernas_y_ratio,
-        "Mesa_Perna", mesa_pai
+        "Mesa_Perna", None
     )
     z_centro_bordas = z_ref_feltro + (espessura_borda_visual / 2)
     objetos_criados["bordas"] = criar_bordas_retangulares_mesa(
         comprimento_area_jogo, largura_area_jogo,
         largura_borda_visual, espessura_borda_visual,
         distancia_borda_do_feltro,
-        z_centro_bordas, "Mesa_Borda", mesa_pai
+        z_centro_bordas, "Mesa_Borda", None
     )
     z_centro_bolsos = z_ref_feltro
     raio_bolso_visual = diametro_bolso_canto_visual / 2
     objetos_criados["bolsos"] = criar_bolsos_mesa(
         comprimento_area_jogo, largura_area_jogo,
         distancia_borda_do_feltro,  # Passando o parâmetro para coordenar os bolsos
-        z_centro_bolsos, raio_bolso_visual, "Mesa_Bolso", mesa_pai
+        z_centro_bolsos, raio_bolso_visual, "Mesa_Bolso", None
     )
     adicionar_materiais_mesa(objetos_criados)
     z_centro_bolas = z_ref_feltro + raio_bola_padrao
     objetos_criados["bolas"] = criar_bolas_sinuca(
         raio_bola_padrao, numero_total_de_bolas,
-        z_centro_bolas, "BolaSinuca", mesa_pai
+        z_centro_bolas, "BolaSinuca", None
     )
     if organizar_bolas_no_rack:
         posicionar_bolas_rack(
             objetos_criados["bolas"], z_centro_bolas,
             raio_bola_padrao, comprimento_area_jogo
         )
-    print(f"Mesa de sinuca criada com raiz em '{mesa_pai.name}'. Feltro a Z={z_ref_feltro:.3f} global.")
+    # --- Cria o Empty e faz o parentesco de todos os objetos ---
+    bpy.ops.object.select_all(action='DESELECT')
+    empty = criar_objeto_pai("MesaSinuca_Raiz", (posicao_mesa_global_xyz[0], posicao_mesa_global_xyz[1], 0))
+    # Seleciona todos os objetos da mesa
+    objetos_para_parent = [
+        objetos_criados["base"],
+        objetos_criados["feltro"]
+    ] + objetos_criados["pernas"] + objetos_criados["bordas"] + objetos_criados["bolsos"] + objetos_criados["bolas"]
+    for obj in objetos_para_parent:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = empty
+    bpy.ops.object.parent_set(type='OBJECT', keep_transform=True)
+    bpy.ops.object.select_all(action='DESELECT')
+    print("Mesa criada: mova o Empty para mover tudo, ou mova cada item separadamente se quiser!")
 
 
-# --- Execução Principal ---
-if __name__ == "__main__":
-    pos_mesa_x = 0.0
-    pos_mesa_y = 0.0
-    altura_feltro_do_chao = 0.77
-    comp_total_estrutura_mesa = 2.54
-    larg_total_estrutura_mesa = 1.42
-    alt_caixa_base_mesa = 0.20
-    alt_pernas = altura_feltro_do_chao - alt_caixa_base_mesa
-    diam_perna = 0.12
-    afast_pernas_x = 0.4
-    afast_pernas_y = 0.4
-    comp_area_jogo_feltro = 1.2
-    larg_area_jogo_feltro = 0.7
-
-    larg_borda_madeira = 0.10
-    alt_borda_madeira = 0.045
-    # AJUSTE AQUI para aproximar as tabelas e bolsos:
-    dist_borda_feltro = 0.005  # Ex: 0.5 cm de distância. Use 0.0 para encostar.
-
-    diam_bolso_canto = 0.118
-    raio_bola = 0.028575
-
-    criar_mesa_sinuca_completa(
-        posicao_mesa_global_xyz=(pos_mesa_x, pos_mesa_y, altura_feltro_do_chao),
-        comprimento_total_estrutura=comp_total_estrutura_mesa,
-        largura_total_estrutura=larg_total_estrutura_mesa,
-        altura_base_estrutura=alt_caixa_base_mesa,
-        altura_pernas_chao_a_base=alt_pernas,
-        diametro_perna=diam_perna,
-        afastamento_pernas_x_ratio=afast_pernas_x,
-        afastamento_pernas_y_ratio=afast_pernas_y,
-        comprimento_area_jogo=comp_area_jogo_feltro,
-        largura_area_jogo=larg_area_jogo_feltro,
-        largura_borda_visual=larg_borda_madeira,
-        espessura_borda_visual=alt_borda_madeira,
-        distancia_borda_do_feltro=dist_borda_feltro,
-        diametro_bolso_canto_visual=diam_bolso_canto,
-        raio_bola_padrao=raio_bola,
-        organizar_bolas_no_rack=True,
-        numero_total_de_bolas=16
+def adicionar_camera_mesa(posicao_mesa_global_xyz, z_ref_feltro):
+    """Adiciona uma câmera à cena posicionada para visualizar a mesa de sinuca."""
+    bpy.ops.object.camera_add(
+        enter_editmode=False,
+        align='VIEW',
+        location=(
+            posicao_mesa_global_xyz[0] + 2.5,
+            posicao_mesa_global_xyz[1] - 2.5,
+            posicao_mesa_global_xyz[2] + 2.2
+        ),
+        rotation=(math.radians(65), 0, math.radians(45))
     )
+    camera = bpy.context.object
+    camera.name = "CameraMesaSinuca"
+    bpy.context.scene.camera = camera
+
+# Chame a função ao final da criação da mesa
+# --- Execução Principal ---
+pos_mesa_x = 0.0
+pos_mesa_y = 0.0
+altura_feltro_do_chao = 0.77
+comp_total_estrutura_mesa = 5.54
+larg_total_estrutura_mesa = 3.0
+alt_caixa_base_mesa = 0.20
+alt_pernas = altura_feltro_do_chao - alt_caixa_base_mesa
+diam_perna = 0.12
+afast_pernas_x = 0.4
+afast_pernas_y = 0.4
+comp_area_jogo_feltro = 2.8
+larg_area_jogo_feltro = 1.4
+
+larg_borda_madeira = 0.20
+alt_borda_madeira = 0.045
+# AJUSTE AQUI para aproximar as tabelas e bolsos:
+dist_borda_feltro = 0.005  # Ex: 0.5 cm de distância. Use 0.0 para encostar.
+
+diam_bolso_canto = 0.118
+raio_bola = 0.028575
+
+posicao_mesa_global_xyz = (pos_mesa_x, pos_mesa_y, altura_feltro_do_chao)
+z_ref_feltro = altura_feltro_do_chao
+
+
+criar_mesa_sinuca_completa(
+    posicao_mesa_global_xyz=posicao_mesa_global_xyz,
+    comprimento_total_estrutura=comp_total_estrutura_mesa,
+    largura_total_estrutura=larg_total_estrutura_mesa,
+    altura_base_estrutura=alt_caixa_base_mesa,
+    altura_pernas_chao_a_base=alt_pernas,
+    diametro_perna=diam_perna,
+    afastamento_pernas_x_ratio=afast_pernas_x,
+    afastamento_pernas_y_ratio=afast_pernas_y,
+    comprimento_area_jogo=comp_area_jogo_feltro,
+    largura_area_jogo=larg_area_jogo_feltro,
+    largura_borda_visual=larg_borda_madeira,
+    espessura_borda_visual=alt_borda_madeira,
+    distancia_borda_do_feltro=dist_borda_feltro,
+    diametro_bolso_canto_visual=diam_bolso_canto,
+    raio_bola_padrao=raio_bola,
+    organizar_bolas_no_rack=True,
+    numero_total_de_bolas=16
+)
+adicionar_camera_mesa(posicao_mesa_global_xyz, z_ref_feltro)
+
+
+
+obj = bpy.context.active_object 
+# Obtenha a localização, dimensões e escala do objeto
+location = obj.location
+dimensions = obj.dimensions
+scale = obj.scale
+
+
+print(
+    f"Nome do objeto: {obj.name}\n"
+    f"Localização: x={location.x:.3f}, y={location.y:.3f}, z={location.z:.3f}\n"
+    f"Tamanho: x={dimensions.x:.3f}, y={dimensions.y:.3f}, z={dimensions.z:.3f}\n"
+    f"Escala: x={scale.x:.3f}, y={scale.y:.3f}, z={scale.z:.3f}"
+)
