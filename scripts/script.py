@@ -22,9 +22,7 @@ def limpar_cena():
             bpy.data.meshes.remove(mesh)
     for collection in bpy.data.collections:  # Limpa coleções vazias se necessário
         if not collection.objects and not collection.children:
-            # Cuidado ao remover coleções, especialmente a padrão
             pass
-
 
 def criar_objeto_pai(nome, localizacao_global):
     """Cria um objeto Empty para servir como pai."""
@@ -93,8 +91,7 @@ def criar_pernas_mesa(comprimento_total_estrutura, largura_total_estrutura,
         pernas_criadas.append(perna)
     return pernas_criadas
 
-
-def criar_borda_unica_mesa(comprimento_area_jogo, largura_area_jogo,
+def criar_borda_mesa(comprimento_area_jogo, largura_area_jogo,
                          largura_borda, espessura_borda,
                          distancia_borda_do_feltro,
                          z_centro_borda, nome_objeto, pai,
@@ -312,7 +309,6 @@ def posicionar_bolas_rack(bolas, z_centro_bolas, raio_bola, comprimento_area_jog
             ball_rack_idx_original += 1
         if ball_rack_idx_original >= len(bolas): break
 
-
 # --- Função Principal de Criação da Mesa ---
 
 def criar_mesa_sinuca_completa(
@@ -359,7 +355,7 @@ def criar_mesa_sinuca_completa(
         "Mesa_Perna", None
     )
     z_centro_bordas = z_ref_feltro + (espessura_borda_visual / 2)
-    objetos_criados["bordas"] = [criar_borda_unica_mesa(
+    objetos_criados["bordas"] = [criar_borda_mesa(
         comprimento_area_jogo, largura_area_jogo,
         largura_borda_visual, espessura_borda_visual,
         distancia_borda_do_feltro,
@@ -425,8 +421,7 @@ larg_area_jogo_feltro = 1.3
 
 larg_borda_madeira = 0.20
 alt_borda_madeira = 0.045
-# AJUSTE AQUI para aproximar as tabelas e bolsos:
-dist_borda_feltro = 0.005  # Ex: 0.5 cm de distância. Use 0.0 para encostar.
+dist_borda_feltro = 0.005
 
 diam_bolso_canto = 0.118
 raio_bola = 0.028575
