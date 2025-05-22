@@ -49,23 +49,67 @@ def criar_cacapas():
 def criar_bolas():
     bola_raio = 0.057
     mesa_altura_total = 1
+    contador_bolas = 1
+    
     for i in range(5):
         for j in range(i + 1):
             x = i * bola_raio * 2.0
             y = (j - i / 2) * bola_raio * 2.0
             z = mesa_altura_total + bola_raio
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=bola_raio, location=(x - 0.5, y, z))
+            bpy.ops.mesh.primitive_uv_sphere_add(
+                radius=bola_raio, 
+                location=(x - 0.5, y, z),
+                calc_uvs=True  # <-- Esta linha gera UVs automaticamente
+            )
             bola = bpy.context.object
-            bola.name = f"Bola_{i}_{j}"
-            mat_bola = bpy.data.materials.new(name=f"Material_Bola_{i}_{j}")
-            mat_bola.diffuse_color = (i / 5.0, j / 5.0, 1.0 - i / 5.0, 1.0)
-            bola.data.materials.append(mat_bola)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=bola_raio, location=(-1.5, 0, mesa_altura_total + bola_raio))
+            bola.name = f"ball{contador_bolas}"
+            contador_bolas += 1
+    
+    # Bola branca
+    bpy.ops.mesh.primitive_uv_sphere_add(
+        radius=bola_raio, 
+        location=(-1.5, 0, mesa_altura_total + bola_raio),
+        calc_uvs=True  # <-- UVs para a bola branca
+    )
     bola_branca = bpy.context.object
-    bola_branca.name = "Bola_Branca"
-    mat_branca = bpy.data.materials.new(name="Material_Bola_Branca")
-    mat_branca.diffuse_color = (1.0, 1.0, 1.0, 1.0)
-    bola_branca.data.materials.append(mat_branca)
+    bola_branca.name = "ballcue"
+
+
+def aplicar_texturas_bolas(pasta_texturas):
+    nomes_bolas = [f"ball{i}" for i in range(1, 16)] + ["ballcue"]
+    
+    for nome_bola in nomes_bolas:
+        obj = bpy.data.objects.get(nome_bola)
+        if obj:
+            caminho_textura = os.path.join(pasta_texturas, f"{nome_bola}.jpg")
+            if os.path.exists(caminho_textura):
+                # Cria material com nodes
+                mat = bpy.data.materials.new(name=f"Material_{nome_bola}")
+                mat.use_nodes = True
+                nodes = mat.node_tree.nodes
+                links = mat.node_tree.links
+                
+                # Remove todos os nós existentes
+                nodes.clear()
+                
+                # Cria nós obrigatórios
+                bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+                material_output = nodes.new(type='ShaderNodeOutputMaterial')  # <-- Nó crítico!
+                
+                # Configura textura
+                tex_image = nodes.new('ShaderNodeTexImage')
+                tex_image.image = bpy.data.images.load(caminho_textura)
+                
+                # Conecta os nós
+                links.new(bsdf.outputs['BSDF'], material_output.inputs['Surface'])  # <-- Conexão correta
+                links.new(tex_image.outputs['Color'], bsdf.inputs['Base Color'])
+                
+                # Aplica o material
+                obj.data.materials.clear()
+                obj.data.materials.append(mat)
+            else:
+                print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
+
 
 def criar_suportes():
     mesa_comprimento = 4.0
@@ -90,7 +134,7 @@ def criar_suportes():
         mat_perna.diffuse_color = (0.2, 0.1, 0.0, 1.0)
         perna.data.materials.append(mat_perna)
 
-    borda = bpy.data.objects["Borda"]  # ou use a referência já existente
+    borda = bpy.data.objects["Borda"]  
 
     # Adiciona o modificador Bevel
     mod_bevel = borda.modifiers.new(name="Bevel", type='BEVEL')
@@ -158,4 +202,5 @@ limpar_cena()
 criar_mesa_de_sinuca()
 criar_cacapas()
 criar_bolas()
+aplicar_texturas_bolas(r'D:\mesadebilhar\Blender-modelagem\assets\Pool Ball Skins')
 criar_suportes()
