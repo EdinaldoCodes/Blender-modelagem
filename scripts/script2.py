@@ -1,5 +1,6 @@
 import bpy
 import math
+import os
 
 def limpar_cena():
     bpy.ops.object.select_all(action='SELECT')
@@ -16,6 +17,41 @@ def definir_pai(objeto, pai):
         objeto.parent = pai
         objeto.matrix_parent_inverse = pai.matrix_world.inverted()
 
+def aplicar_texturas_bolas(pasta_texturas):
+    nomes_bolas = [f"Ball{i}" for i in range(1, 16)] + ["Ballcue"]
+    
+    for nome_bola in nomes_bolas:
+        obj = bpy.data.objects.get(nome_bola)
+        if obj:
+            caminho_textura = os.path.join(pasta_texturas, f"{nome_bola}.jpg")
+            if os.path.exists(caminho_textura):
+                # Cria material com nodes
+                mat = bpy.data.materials.new(name=f"Material_{nome_bola}")
+                mat.use_nodes = True
+                nodes = mat.node_tree.nodes
+                links = mat.node_tree.links
+                
+                # Remove todos os nós existentes
+                nodes.clear()
+                
+                # Cria nós obrigatórios
+                bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+                material_output = nodes.new(type='ShaderNodeOutputMaterial')  # <-- Nó crítico!
+                
+                # Configura textura
+                tex_image = nodes.new('ShaderNodeTexImage')
+                tex_image.image = bpy.data.images.load(caminho_textura)
+                
+                # Conecta os nós
+                links.new(bsdf.outputs['BSDF'], material_output.inputs['Surface'])  # <-- Conexão correta
+                links.new(tex_image.outputs['Color'], bsdf.inputs['Base Color'])
+                
+                # Aplica o material
+                obj.data.materials.clear()
+                obj.data.materials.append(mat)
+            else:
+                print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
+
 def criar_mesa_de_sinuca():
     # Parâmetros principais
     mesa_largura = 2.0
@@ -29,7 +65,7 @@ def criar_mesa_de_sinuca():
     cacapa_raio = 0.1
     bola_raio = 0.057
     perna_raio = 0.12
-    afastamento_y = 0.1 
+    afastamento_y = 0.1
 
     # Tampo da mesa
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total - mesa_espessura / 2))
@@ -79,16 +115,8 @@ def criar_mesa_de_sinuca():
         (0, -mesa_largura / 2, mesa_altura_total),
     ]
     cacapas = []
-    # Aplicar escala do tampo antes da booleana para evitar problemas
-    bpy.context.view_layer.objects.active = mesa
-    bpy.ops.object.transform_apply(scale=True)
     for i, pos in enumerate(posicoes_cacapas):
-        # O cilindro atravessa totalmente o tampo
-        bpy.ops.mesh.primitive_cylinder_add(
-            radius=cacapa_raio,
-            depth=mesa_espessura + 0.05,  # Garante que atravessa o tampo
-            location=(pos[0], pos[1], mesa_altura_total)
-        )
+        bpy.ops.mesh.primitive_cylinder_add(radius=cacapa_raio, depth=borda_altura + mesa_espessura + 0.01, location=(pos[0], pos[1], pos[2] - mesa_espessura / 2))
         cacapa = bpy.context.object
         cacapa.name = f"Cacapa_{i}"
        
@@ -110,29 +138,32 @@ def criar_mesa_de_sinuca():
 
     # Bolas
     bolas = []
+    contador_bolas = 1
     for i in range(5):
         for j in range(i + 1):
             x = i * bola_raio * 2.0
             y = (j - i / 2) * bola_raio * 2.0
             z = mesa_altura_total + bola_raio
-            
-            # Adicionando as bolas coloridas
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=bola_raio, location=(x - 0.5, y, z))
+            bpy.ops.mesh.primitive_uv_sphere_add(
+                radius=bola_raio,
+                location=(x - 0.5, y, z),
+                calc_uvs=True
+            )
             bola = bpy.context.object
-            bola.name = f"Bola_{i}_{j}"
-            mat_bola = bpy.data.materials.new(name=f"Material_Bola_{i}_{j}")
-            mat_bola.diffuse_color = (i / 5.0, j / 5.0, 1.0 - i / 5.0, 1.0)
-            bola.data.materials.append(mat_bola)
+            bola.name = f"Ball{contador_bolas}"
             bolas.append(bola)
-
-    # Adicionando a bola branca        
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=bola_raio, location=(-1.5, 0, mesa_altura_total + bola_raio))
+            contador_bolas += 1
+    # Bola branca
+    bpy.ops.mesh.primitive_uv_sphere_add(
+        radius=bola_raio,
+        location=(-1.5, 0, mesa_altura_total + bola_raio),
+        calc_uvs=True
+    )
     bola_branca = bpy.context.object
-    bola_branca.name = "Bola_Branca"
-    mat_branca = bpy.data.materials.new(name="Material_Bola_Branca")
-    mat_branca.diffuse_color = (1.0, 1.0, 1.0, 1.0)
-    bola_branca.data.materials.append(mat_branca)
+    bola_branca.name = "Ballcue"
     bolas.append(bola_branca)
+
+    aplicar_texturas_bolas(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins')
 
     # Suportes
     perna_altura = mesa_altura_total - mesa_espessura - base_espessura
@@ -165,4 +196,3 @@ def criar_mesa_de_sinuca():
 
 limpar_cena()
 criar_mesa_de_sinuca()
-
