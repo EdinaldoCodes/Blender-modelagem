@@ -33,7 +33,10 @@ def aplicar_texturas_bolas(pasta_texturas):
                 
                 # Remove todos os nós existentes
                 nodes.clear()
-                
+
+                if not nodes:
+                    print("nodes está vazio")
+
                 # Cria nós obrigatórios
                 bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
                 material_output = nodes.new(type='ShaderNodeOutputMaterial')  # <-- Nó crítico!
@@ -52,6 +55,67 @@ def aplicar_texturas_bolas(pasta_texturas):
             else:
                 print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
 
+def aplicar_textura_feltro(pasta_textura):
+    caminho_base_color = os.path.join(pasta_textura, "3D_1213_C0747_W24.tif.jpg")
+    caminho_roughness = os.path.join(pasta_textura, "divina 0106_Roughness.jpg")
+
+    if os.path.exists(caminho_base_color):
+        feltro = bpy.data.materials.new(name="Feltro_Material")
+        feltro.use_nodes = True
+        nodes = feltro.node_tree.nodes
+        links = feltro.node_tree.links
+        nodes.clear()
+        bsdf = nodes.new('ShaderNodeBsdfPrincipled')
+        material_output = nodes.new('ShaderNodeOutputMaterial')
+        # Base Color
+        tex_image = nodes.new('ShaderNodeTexImage')
+        tex_image.image = bpy.data.images.load(caminho_base_color)
+        links.new(tex_image.outputs['Color'], bsdf.inputs['Base Color'])
+        # Roughness (opcional, para um leve efeito)
+        if os.path.exists(caminho_roughness):
+            tex_roughness = nodes.new('ShaderNodeTexImage')
+            tex_roughness.image = bpy.data.images.load(caminho_roughness)
+            tex_roughness.image.colorspace_settings.name = 'Non-Color'
+            links.new(tex_roughness.outputs['Color'], bsdf.inputs['Roughness'])
+        else:
+            bsdf.inputs['Roughness'].default_value = 0.5  # valor padrão suave
+        links.new(bsdf.outputs['BSDF'], material_output.inputs['Surface'])
+        obj = bpy.data.objects.get("Feltro")
+        if obj:
+            obj.data.materials.clear()
+            obj.data.materials.append(feltro)
+        else:
+            print("ERRO: Objeto 'Feltro' não encontrado!")
+    else:
+        print(f"ERRO: Arquivo {caminho_base_color} não encontrado!")
+
+def aplicar_textura_moldura(pasta_textura):
+    caminho_textura = os.path.join(pasta_textura, "madeira2.jpg")
+    if os.path.exists(caminho_textura):
+        # Cria material com nodes
+        moldura = bpy.data.materials.new(name="Moldura_Material")
+        moldura.use_nodes = True
+        nodes = moldura.node_tree.nodes
+        links = moldura.node_tree.links
+        
+        # Remove todos os nós existentes para evitar conflitos
+        for n in nodes:
+            nodes.remove(n)
+        # Cria nós obrigatórios
+        tex_image = nodes.new('ShaderNodeTexImage')
+        tex_image.image = bpy.data.images.load(caminho_textura)
+        bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+        material_output = nodes.new(type='ShaderNodeOutputMaterial')
+        # Conecta textura -> BSDF -> Output
+        links.new(tex_image.outputs['Color'], bsdf.inputs['Base Color'])
+        links.new(bsdf.outputs['BSDF'], material_output.inputs['Surface'])
+        # Aplica o material ao objeto correto (moldura)
+        obj = bpy.context.object
+        obj.data.materials.clear()
+        obj.data.materials.append(moldura)
+    else:
+        print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
+
 def criar_mesa_de_sinuca():
     # Parâmetros principais
     mesa_largura = 2.0
@@ -68,14 +132,16 @@ def criar_mesa_de_sinuca():
     afastamento_y = 0.1
 
     # Tampo da mesa
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total - mesa_espessura / 2))
+    bpy.ops.mesh.primitive_cube_add(
+        size=1, 
+        location=(0, 0, mesa_altura_total - mesa_espessura / 2),
+        calc_uvs=True)
     mesa = bpy.context.object
     mesa.scale = (mesa_comprimento, mesa_largura, mesa_espessura)
-    mesa.name = "Mesa_Base"
-    mat_mesa = bpy.data.materials.new(name="Material_Mesa")
-    mat_mesa.diffuse_color = (0.0, 0.3, 0.0, 1.0)
-    mesa.data.materials.append(mat_mesa)
-
+    mesa.name = "Feltro"
+    # aplicar_textura_feltro(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins\fabrics_0075_2k_Rar2co')
+    aplicar_textura_feltro(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\textures')
+    
     # Moldura
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total))
     borda = bpy.context.object
@@ -84,6 +150,8 @@ def criar_mesa_de_sinuca():
     mat_borda = bpy.data.materials.new(name="Material_Borda")
     mat_borda.diffuse_color = (0.4, 0.2, 0.0, 1.0)
     borda.data.materials.append(mat_borda)
+
+    aplicar_textura_moldura(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins')
     
     # Recorte do centro
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total))
@@ -144,6 +212,8 @@ def criar_mesa_de_sinuca():
             x = i * bola_raio * 2.0
             y = (j - i / 2) * bola_raio * 2.0
             z = mesa_altura_total + bola_raio
+
+            # Adiciona a bola
             bpy.ops.mesh.primitive_uv_sphere_add(
                 radius=bola_raio,
                 location=(x - 0.5, y, z),
@@ -164,6 +234,7 @@ def criar_mesa_de_sinuca():
     bolas.append(bola_branca)
 
     aplicar_texturas_bolas(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins')
+    
 
     # Suportes
     perna_altura = mesa_altura_total - mesa_espessura - base_espessura

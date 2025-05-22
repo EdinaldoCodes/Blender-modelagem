@@ -29,7 +29,7 @@ def criar_objeto_pai(nome, localizacao_global):
     bpy.ops.object.empty_add(type='PLAIN_AXES', location=localizacao_global)
     pai = bpy.context.object
     pai.name = nome
-    return pai
+    return pai  
 
 def definir_pai(objeto, pai):
     """Define o parentesco de um objeto."""
@@ -47,7 +47,6 @@ def criar_base_mesa(comprimento_base, largura_base, altura_base, z_centro_base, 
     base.scale = (comprimento_base / 2, largura_base / 2, altura_base / 1.1)
     definir_pai(base, pai)
     return base
-
 
 def criar_superficie_jogo(comprimento_jogo, largura_jogo, z_superficie, nome_objeto, pai):
     """Cria a superfície de jogo (feltro) da mesa de sinuca."""
@@ -309,6 +308,7 @@ def posicionar_bolas_rack(bolas, z_centro_bolas, raio_bola, comprimento_area_jog
             ball_rack_idx_original += 1
         if ball_rack_idx_original >= len(bolas): break
 
+
 # --- Função Principal de Criação da Mesa ---
 
 def criar_mesa_sinuca_completa(
@@ -389,7 +389,7 @@ def criar_mesa_sinuca_completa(
     print("Mesa criada: mova o Empty para mover tudo, ou mova cada item separadamente se quiser!")
 
 
-def adicionar_camera_mesa(posicao_mesa_global_xyz, z_ref_feltro):
+def adicionar_camera_mesa(posicao_mesa_global_xyz):
     """Adiciona uma câmera à cena posicionada para visualizar a mesa de sinuca."""
     bpy.ops.object.camera_add(
         enter_editmode=False,
@@ -404,51 +404,33 @@ def adicionar_camera_mesa(posicao_mesa_global_xyz, z_ref_feltro):
     camera = bpy.context.object
     camera.name = "CameraMesaSinuca"
     bpy.context.scene.camera = camera
-
+    bpy.ops.object.select_all(action='DESELECT')
+     
 # --- Execução Principal ---
-pos_mesa_x = 0.0
-pos_mesa_y = 0.0
-altura_feltro_do_chao = 0.77
-comp_total_estrutura_mesa = 5.54
-larg_total_estrutura_mesa = 3.0
-alt_caixa_base_mesa = 0.20
-alt_pernas = altura_feltro_do_chao - alt_caixa_base_mesa
-diam_perna = 0.12
-afast_pernas_x = 0.45
-afast_pernas_y = 0.45
-comp_area_jogo_feltro = 2.6
-larg_area_jogo_feltro = 1.3
-
-larg_borda_madeira = 0.20
-alt_borda_madeira = 0.045
-dist_borda_feltro = 0.005
-
-diam_bolso_canto = 0.118
-raio_bola = 0.028575
-
-posicao_mesa_global_xyz = (pos_mesa_x, pos_mesa_y, altura_feltro_do_chao)
-z_ref_feltro = altura_feltro_do_chao
-
+# Posiciona a mesa na cena do chão até a base da mesa
+posicao_mesa_global_xyz = (0.0, 0.0, 0.77)
 
 criar_mesa_sinuca_completa(
     posicao_mesa_global_xyz=posicao_mesa_global_xyz,
-    comprimento_total_estrutura=comp_total_estrutura_mesa,
-    largura_total_estrutura=larg_total_estrutura_mesa,
-    altura_base_estrutura=alt_caixa_base_mesa,
-    altura_pernas_chao_a_base=alt_pernas,
-    diametro_perna=diam_perna,
-    afastamento_pernas_x_ratio=afast_pernas_x,
-    afastamento_pernas_y_ratio=afast_pernas_y,
-    comprimento_area_jogo=comp_area_jogo_feltro,
-    largura_area_jogo=larg_area_jogo_feltro,
-    largura_borda_visual=larg_borda_madeira,
-    espessura_borda_visual=alt_borda_madeira,
-    distancia_borda_do_feltro=dist_borda_feltro,
-    diametro_bolso_canto_visual=diam_bolso_canto,
-    raio_bola_padrao=raio_bola,
+    comprimento_total_estrutura=5.54,
+    largura_total_estrutura=3.0,
+    altura_base_estrutura=0.20,
+    altura_pernas_chao_a_base=0.77 - 0.20,
+    diametro_perna=0.12,
+    afastamento_pernas_x_ratio=0.45,
+    afastamento_pernas_y_ratio=0.45,
+    comprimento_area_jogo=2.6,
+    largura_area_jogo=1.3,
+    largura_borda_visual=0.20,
+    espessura_borda_visual=0.045,
+    distancia_borda_do_feltro=0.005,
+    diametro_bolso_canto_visual=0.118,
+    raio_bola_padrao=0.028575,
     organizar_bolas_no_rack=True,
     numero_total_de_bolas=16
 )
-adicionar_camera_mesa(posicao_mesa_global_xyz, z_ref_feltro)
+adicionar_camera_mesa(posicao_mesa_global_xyz)
+
+
 
 
