@@ -49,28 +49,28 @@ def criar_cacapas():
 def criar_bolas():
     bola_raio = 0.057
     mesa_altura_total = 1
+
+    # Parâmetros para posicionamento
+    base_x = 0.8  # Posição do triângulo na mesa (ajuste conforme necessário)
+    base_y = 0.0
     contador_bolas = 1
-    
-    for i in range(5):
+
+    # Cria as bolas numeradas (1 a 15) em formato de triângulo
+    for i in range(5):  # 5 linhas
         for j in range(i + 1):
-            x = i * bola_raio * 2.0
-            y = (j - i / 2) * bola_raio * 2.0
+            x = base_x + i * bola_raio * 2.0
+            y = base_y + (j - i / 2) * bola_raio * 2.0
             z = mesa_altura_total + bola_raio
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=bola_raio, 
-                location=(x - 0.5, y, z),
-                calc_uvs=True  # <-- Esta linha gera UVs automaticamente
-            )
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=bola_raio, location=(x, y, z))
             bola = bpy.context.object
             bola.name = f"ball{contador_bolas}"
             contador_bolas += 1
+
     
-    # Bola branca
-    bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=bola_raio, 
-        location=(-1.5, 0, mesa_altura_total + bola_raio),
-        calc_uvs=True  # <-- UVs para a bola branca
-    )
+    x_branca = -1.2
+    y_branca = 0.0
+    z_branca = mesa_altura_total + bola_raio
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=bola_raio, location=(x_branca, y_branca, z_branca))
     bola_branca = bpy.context.object
     bola_branca.name = "ballcue"
 
@@ -148,6 +148,37 @@ def criar_suportes():
     bpy.ops.object.modifier_apply(modifier=mod_bevel.name)
     # Se ainda não ficar arredondado o suficiente, aumente ainda mais o width ou crie a moldura a partir de uma curva com raio nos cantos.
 
+def criar_caixa_coletora():
+    # Parâmetros da mesa
+    mesa_largura = 2.0
+    mesa_comprimento = 4.0
+    mesa_altura_total = 1.0
+    mesa_espessura = 0.05
+    base_espessura = 0.45
+    
+    # Parâmetros da caixa coletora
+    caixa_largura = 1.0       # Maior na largura
+    caixa_altura = 0.25       # Mais alta
+    caixa_profundidade = 0.3  # Suficientemente profunda
+    
+    # Posição: do lado da base, centralizada no eixo X
+    caixa_x = 0
+    caixa_y = -(mesa_largura/2 + caixa_profundidade/2 - 0.01)
+    caixa_z = (mesa_altura_total - mesa_espessura - base_espessura) + caixa_altura/2
+    
+    bpy.ops.mesh.primitive_cube_add(
+        size=1,
+        location=(caixa_x, caixa_y, caixa_z)
+    )
+    caixa = bpy.context.object
+    caixa.name = "Caixa_Coletora"
+    caixa.scale = (caixa_largura/2, caixa_profundidade/2, caixa_altura/2)
+    
+    # Material
+    mat_caixa = bpy.data.materials.new(name="Material_Caixa_Coletora")
+    mat_caixa.diffuse_color = (0.3, 0.15, 0.05, 1.0)
+    caixa.data.materials.append(mat_caixa)
+
 def criar_mesa_de_sinuca():
     mesa_largura = 2.0
     mesa_comprimento = 4.0
@@ -155,7 +186,7 @@ def criar_mesa_de_sinuca():
     mesa_espessura = 0.05
     borda_altura = 0.1
     borda_espessura = 0.25
-    base_espessura = 0.3
+    base_espessura = 0.45
     base_scale_reduction = 1.10  # Fator de redução original
 
     # Tampo da mesa (feltro)
@@ -192,11 +223,12 @@ def criar_mesa_de_sinuca():
     # Base da mesa 
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total - mesa_espessura - base_espessura / 2))
     base = bpy.context.object
-    base.scale = (4.20099, mesa_largura * base_scale_reduction, base_espessura)
+    base.scale = (4.2, mesa_largura * base_scale_reduction, base_espessura)
     base.name = "Base_Mesa"
     mat_base = bpy.data.materials.new(name="Material_Base")
     mat_base.diffuse_color = (0.2, 0.1, 0.0, 1.0)
     base.data.materials.append(mat_base)
+    
 
 limpar_cena()
 criar_mesa_de_sinuca()
@@ -204,3 +236,4 @@ criar_cacapas()
 criar_bolas()
 aplicar_texturas_bolas(r'D:\mesadebilhar\Blender-modelagem\assets\Pool Ball Skins')
 criar_suportes()
+criar_caixa_coletora()
