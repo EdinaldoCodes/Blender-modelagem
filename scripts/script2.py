@@ -116,6 +116,37 @@ def aplicar_textura_moldura(pasta_textura):
     else:
         print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
 
+def criar_caixa_coletora():
+    # Parâmetros da mesa
+    mesa_largura = 2.0
+    mesa_comprimento = 4.0
+    mesa_altura_total = 1.0
+    mesa_espessura = 0.05
+    base_espessura = 0.45
+    
+    # Parâmetros da caixa coletora
+    caixa_largura = 1.0       # Maior na largura
+    caixa_altura = 0.33      # Mais alta
+    caixa_profundidade = 0.3  # Suficientemente profunda
+    
+    # Posição: do lado da base, centralizada no eixo X
+    caixa_x = 0
+    caixa_y = -(mesa_largura/2 + caixa_profundidade/2 - 0.01)
+    caixa_z = 0.68
+    
+    bpy.ops.mesh.primitive_cube_add(
+        size=1,
+        location=(caixa_x, caixa_y, caixa_z)
+    )
+    caixa = bpy.context.object
+    caixa.name = "Caixa_Coletora"
+    caixa.scale = (caixa_largura/2, caixa_profundidade/2, caixa_altura/2)
+    
+    # Material
+    mat_caixa = bpy.data.materials.new(name="Material_Caixa_Coletora")
+    mat_caixa.diffuse_color = (0.3, 0.15, 0.05, 1.0)
+    caixa.data.materials.append(mat_caixa)
+
 def criar_mesa_de_sinuca():
     # Parâmetros principais
     mesa_largura = 2.0
@@ -124,7 +155,7 @@ def criar_mesa_de_sinuca():
     mesa_espessura = 0.05
     borda_altura = 0.1
     borda_espessura = 0.25
-    base_espessura = 0.3
+    base_espessura = 0.44
     base_scale_reduction = 1.10
     cacapa_raio = 0.1
     bola_raio = 0.057
@@ -167,11 +198,12 @@ def criar_mesa_de_sinuca():
     # Base
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total - mesa_espessura - base_espessura / 2))
     base = bpy.context.object
-    base.scale = (4.20099, mesa_largura * base_scale_reduction, base_espessura)
+    base.scale = (4.2, mesa_largura * base_scale_reduction, base_espessura)
     base.name = "Base_Mesa"
     mat_base = bpy.data.materials.new(name="Material_Base")
     mat_base.diffuse_color = (0.2, 0.1, 0.0, 1.0)
     base.data.materials.append(mat_base)
+    
 
     # Caçapas
     posicoes_cacapas = [
@@ -267,3 +299,4 @@ def criar_mesa_de_sinuca():
 
 limpar_cena()
 criar_mesa_de_sinuca()
+criar_caixa_coletora()
