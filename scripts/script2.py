@@ -1,6 +1,7 @@
 import bpy
 import math
 import os
+import random
 
 def limpar_cena():
     bpy.ops.object.select_all(action='SELECT')
@@ -17,7 +18,13 @@ def definir_pai(objeto, pai):
         objeto.parent = pai
         objeto.matrix_parent_inverse = pai.matrix_world.inverted()
 
-def aplicar_texturas_bolas(pasta_texturas):
+def caminho_relativo(rel_path):
+    """Retorna o caminho absoluto a partir do diretório do script."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, rel_path)
+
+def aplicar_texturas_bolas(pasta_texturas_rel):
+    pasta_texturas = caminho_relativo(pasta_texturas_rel)
     nomes_bolas = [f"Ball{i}" for i in range(1, 16)] + ["Ballcue"]
     
     for nome_bola in nomes_bolas:
@@ -55,8 +62,9 @@ def aplicar_texturas_bolas(pasta_texturas):
             else:
                 print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
 
-def aplicar_textura_feltro(pasta_textura):
-    caminho_base_color = os.path.join(pasta_textura, "3D_1213_C0747_W24.tif.jpg")
+def aplicar_textura_feltro(pasta_textura_rel):
+    pasta_textura = caminho_relativo(pasta_textura_rel)
+    caminho_base_color = os.path.join(pasta_textura, "3D_1213_C0871_W24.tif.jpg")
     caminho_roughness = os.path.join(pasta_textura, "divina 0106_Roughness.jpg")
 
     if os.path.exists(caminho_base_color):
@@ -89,7 +97,8 @@ def aplicar_textura_feltro(pasta_textura):
     else:
         print(f"ERRO: Arquivo {caminho_base_color} não encontrado!")
 
-def aplicar_textura_moldura(pasta_textura):
+def aplicar_textura_moldura(pasta_textura_rel):
+    pasta_textura = caminho_relativo(pasta_textura_rel)
     caminho_textura = os.path.join(pasta_textura, "madeira2.jpg")
     if os.path.exists(caminho_textura):
         # Cria material com nodes
@@ -116,37 +125,6 @@ def aplicar_textura_moldura(pasta_textura):
     else:
         print(f"ERRO: Arquivo {caminho_textura} não encontrado!")
 
-def criar_caixa_coletora():
-    # Parâmetros da mesa
-    mesa_largura = 2.0
-    mesa_comprimento = 4.0
-    mesa_altura_total = 1.0
-    mesa_espessura = 0.05
-    base_espessura = 0.45
-    
-    # Parâmetros da caixa coletora
-    caixa_largura = 1.0       # Maior na largura
-    caixa_altura = 0.33      # Mais alta
-    caixa_profundidade = 0.3  # Suficientemente profunda
-    
-    # Posição: do lado da base, centralizada no eixo X
-    caixa_x = 0
-    caixa_y = -(mesa_largura/2 + caixa_profundidade/2 - 0.01)
-    caixa_z = 0.68
-    
-    bpy.ops.mesh.primitive_cube_add(
-        size=1,
-        location=(caixa_x, caixa_y, caixa_z)
-    )
-    caixa = bpy.context.object
-    caixa.name = "Caixa_Coletora"
-    caixa.scale = (caixa_largura/2, caixa_profundidade/2, caixa_altura/2)
-    
-    # Material
-    mat_caixa = bpy.data.materials.new(name="Material_Caixa_Coletora")
-    mat_caixa.diffuse_color = (0.3, 0.15, 0.05, 1.0)
-    caixa.data.materials.append(mat_caixa)
-
 def criar_mesa_de_sinuca():
     # Parâmetros principais
     mesa_largura = 2.0
@@ -161,6 +139,11 @@ def criar_mesa_de_sinuca():
     bola_raio = 0.057
     perna_raio = 0.12
     afastamento_y = 0.1
+    caixa_largura = 1.0       # Maior na largura
+    caixa_altura = 0.33      # Mais alta
+    caixa_profundidade = 0.3  # Suficientemente profunda
+
+    limpar_cena()
 
     # Tampo da mesa
     bpy.ops.mesh.primitive_cube_add(
@@ -170,8 +153,7 @@ def criar_mesa_de_sinuca():
     mesa = bpy.context.object
     mesa.scale = (mesa_comprimento, mesa_largura, mesa_espessura)
     mesa.name = "Feltro"
-    # aplicar_textura_feltro(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins\fabrics_0075_2k_Rar2co')
-    aplicar_textura_feltro(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\textures')
+    aplicar_textura_feltro(os.path.join('..', 'assets', 'feltro'))
     
     # Moldura
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total))
@@ -181,8 +163,7 @@ def criar_mesa_de_sinuca():
     mat_borda = bpy.data.materials.new(name="Material_Borda")
     mat_borda.diffuse_color = (0.4, 0.2, 0.0, 1.0)
     borda.data.materials.append(mat_borda)
-
-    aplicar_textura_moldura(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins')
+    aplicar_textura_moldura(os.path.join('..', 'assets', 'Pool Ball Skins'))
     
     # Recorte do centro
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total))
@@ -203,6 +184,26 @@ def criar_mesa_de_sinuca():
     mat_base = bpy.data.materials.new(name="Material_Base")
     mat_base.diffuse_color = (0.2, 0.1, 0.0, 1.0)
     base.data.materials.append(mat_base)
+
+    # Mesa coletora
+    # Posição: do lado da base, centralizada no eixo X
+    caixa_x = 0
+    caixa_y = -(mesa_largura/2 + caixa_profundidade/2 - 0.01)
+    caixa_z = 0.68
+    
+    bpy.ops.mesh.primitive_cube_add(
+        size=1,
+        location=(caixa_x, caixa_y, caixa_z)
+    )
+    caixa = bpy.context.object
+    caixa.name = "Caixa_Coletora"
+    caixa.scale = (caixa_largura/2, caixa_profundidade/2, caixa_altura/2)
+    
+    # Material da caixa coletora
+    mat_caixa = bpy.data.materials.new(name="Material_Caixa_Coletora")
+    mat_caixa.diffuse_color = (0.3, 0.15, 0.05, 1.0)
+    caixa.data.materials.append(mat_caixa)
+
     
 
     # Caçapas
@@ -239,33 +240,81 @@ def criar_mesa_de_sinuca():
     # Bolas
     bolas = []
     contador_bolas = 1
-    for i in range(5):
-        for j in range(i + 1):
-            x = i * bola_raio * 2.0
-            y = (j - i / 2) * bola_raio * 2.0
-            z = mesa_altura_total + bola_raio
+    bola_raio = 0.057
 
-            # Adiciona a bola
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=bola_raio,
-                location=(x - 0.5, y, z),
-                calc_uvs=True
-            )
-            bola = bpy.context.object
-            bola.name = f"Ball{contador_bolas}"
-            bolas.append(bola)
-            contador_bolas += 1
-    # Bola branca
+    # Parâmetros da mesa para cálculo da área jogável
+    mesa_comprimento = 4.0
+    mesa_largura = 2.0
+    mesa_altura_total = 1.0
+    borda_espessura = 0.25
+
+    # Limites da área verde (parte jogável)
+    min_x = -mesa_comprimento/2 + borda_espessura + bola_raio
+    max_x = mesa_comprimento/2 - borda_espessura - bola_raio
+    min_y = -mesa_largura/2 + borda_espessura + bola_raio
+    max_y = mesa_largura/2 - borda_espessura - bola_raio
+    z = mesa_altura_total + bola_raio
+
+    # Criar bolas coloridas aleatoriamente (1-15)
+    posicoes_ocupadas = []  # Lista para evitar sobreposição
+
+    for i in range(1, 16):
+        # Tentar encontrar posição que não sobreponha outras bolas
+        tentativas = 0
+        while tentativas < 20:  # Limite de tentativas para evitar loop infinito
+            x = random.uniform(min_x, max_x)
+            y = random.uniform(min_y, max_y)
+            
+            # Verificar se a posição está longe o suficiente das outras bolas
+            posicao_valida = True
+            for pos in posicoes_ocupadas:
+                dist = math.sqrt((x - pos[0])**2 + (y - pos[1])**2)
+                if dist < bola_raio * 3.0:  # 2.2 = distância mínima entre centros
+                    posicao_valida = False
+                    break
+                    
+            if posicao_valida:
+                posicoes_ocupadas.append((x, y))
+                break
+                
+            tentativas += 1
+        
+        # Criar a bola na posição encontrada (ou a última tentativa)
+        bpy.ops.mesh.primitive_uv_sphere_add(
+            radius=bola_raio,
+            location=(x, y, z),
+            calc_uvs=True
+        )
+        bola = bpy.context.object
+        bola.name = f"Ball{contador_bolas}"
+        
+        # Adicionar rotação aleatória em todos os eixos
+        bola.rotation_euler.x = random.uniform(0, 2 * math.pi)
+        bola.rotation_euler.y = random.uniform(0, 2 * math.pi)
+        bola.rotation_euler.z = random.uniform(0, 2 * math.pi)
+        
+        bolas.append(bola)
+        contador_bolas += 1
+
+
+    # Bola branca (cue) - posição mais à esquerda do campo
     bpy.ops.mesh.primitive_uv_sphere_add(
         radius=bola_raio,
-        location=(-1.5, 0, mesa_altura_total + bola_raio),
+        location=(min_x + bola_raio * 3, 0, z),  # Posição clássica para início
         calc_uvs=True
     )
     bola_branca = bpy.context.object
     bola_branca.name = "Ballcue"
+    
+    # Rotação aleatória para a bola branca
+    bola_branca.rotation_euler.x = random.uniform(0, 2 * math.pi)
+    bola_branca.rotation_euler.y = random.uniform(0, 2 * math.pi)
+    bola_branca.rotation_euler.z = random.uniform(0, 2 * math.pi)
+    
     bolas.append(bola_branca)
 
-    aplicar_texturas_bolas(r'C:\Users\Edinaldo\Documents\Blender\Blender-modelagem\assets\Pool Ball Skins')
+    # Aplicar texturas às bolas
+    aplicar_texturas_bolas(os.path.join('..', 'assets', 'Pool Ball Skins'))
     
 
     # Suportes
@@ -297,6 +346,6 @@ def criar_mesa_de_sinuca():
         definir_pai(obj, empty)
     # Caçapas não precisam ser parented pois são removidas após boolean
 
-limpar_cena()
-criar_mesa_de_sinuca()
-criar_caixa_coletora()
+criar_mesa_de_sinuca()  
+
+
