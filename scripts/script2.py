@@ -2,6 +2,7 @@ import bpy
 import math
 import os
 import random
+import random
 
 def limpar_cena():
     bpy.ops.object.select_all(action='SELECT')
