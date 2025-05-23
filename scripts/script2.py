@@ -1,6 +1,7 @@
 import bpy
 import math
 import os
+import random
 
 def limpar_cena():
     bpy.ops.object.select_all(action='SELECT')
@@ -171,30 +172,80 @@ def criar_mesa_de_sinuca():
     # Bolas
     bolas = []
     contador_bolas = 1
-    for i in range(5):
-        for j in range(i + 1):
-            x = i * bola_raio * 2.0
-            y = (j - i / 2) * bola_raio * 2.0
-            z = mesa_altura_total + bola_raio
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=bola_raio,
-                location=(x - 0.5, y, z),
-                calc_uvs=True
-            )
-            bola = bpy.context.object
-            bola.name = f"Ball{contador_bolas}"
-            bolas.append(bola)
-            contador_bolas += 1
-    # Bola branca
+    bola_raio = 0.057
+
+    # Parâmetros da mesa para cálculo da área jogável
+    mesa_comprimento = 4.0
+    mesa_largura = 2.0
+    mesa_altura_total = 1.0
+    borda_espessura = 0.25
+
+    # Limites da área verde (parte jogável)
+    min_x = -mesa_comprimento/2 + borda_espessura + bola_raio
+    max_x = mesa_comprimento/2 - borda_espessura - bola_raio
+    min_y = -mesa_largura/2 + borda_espessura + bola_raio
+    max_y = mesa_largura/2 - borda_espessura - bola_raio
+    z = mesa_altura_total + bola_raio
+
+    # Criar bolas coloridas aleatoriamente (1-15)
+    posicoes_ocupadas = []  # Lista para evitar sobreposição
+
+    for i in range(1, 16):
+        # Tentar encontrar posição que não sobreponha outras bolas
+        tentativas = 0
+        while tentativas < 20:  # Limite de tentativas para evitar loop infinito
+            x = random.uniform(min_x, max_x)
+            y = random.uniform(min_y, max_y)
+            
+            # Verificar se a posição está longe o suficiente das outras bolas
+            posicao_valida = True
+            for pos in posicoes_ocupadas:
+                dist = math.sqrt((x - pos[0])**2 + (y - pos[1])**2)
+                if dist < bola_raio * 3.0:  # 2.2 = distância mínima entre centros
+                    posicao_valida = False
+                    break
+                    
+            if posicao_valida:
+                posicoes_ocupadas.append((x, y))
+                break
+                
+            tentativas += 1
+        
+        # Criar a bola na posição encontrada (ou a última tentativa)
+        bpy.ops.mesh.primitive_uv_sphere_add(
+            radius=bola_raio,
+            location=(x, y, z),
+            calc_uvs=True
+        )
+        bola = bpy.context.object
+        bola.name = f"Ball{contador_bolas}"
+        
+        # Adicionar rotação aleatória em todos os eixos
+        bola.rotation_euler.x = random.uniform(0, 2 * math.pi)
+        bola.rotation_euler.y = random.uniform(0, 2 * math.pi)
+        bola.rotation_euler.z = random.uniform(0, 2 * math.pi)
+        
+        bolas.append(bola)
+        contador_bolas += 1
+
+
+    # Bola branca (cue) - posição mais à esquerda do campo
     bpy.ops.mesh.primitive_uv_sphere_add(
         radius=bola_raio,
-        location=(-1.5, 0, mesa_altura_total + bola_raio),
+        location=(min_x + bola_raio * 3, 0, z),  # Posição clássica para início
         calc_uvs=True
     )
     bola_branca = bpy.context.object
     bola_branca.name = "Ballcue"
+    
+    # Rotação aleatória para a bola branca
+    bola_branca.rotation_euler.x = random.uniform(0, 2 * math.pi)
+    bola_branca.rotation_euler.y = random.uniform(0, 2 * math.pi)
+    bola_branca.rotation_euler.z = random.uniform(0, 2 * math.pi)
+    
     bolas.append(bola_branca)
 
+    # Aplicar texturas às bolas
     aplicar_texturas_bolas(r'D:\mesadebilhar\Blender-modelagem\assets\Pool Ball Skins')
 
     # Suportes
