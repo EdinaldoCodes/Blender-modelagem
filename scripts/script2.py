@@ -3,30 +3,18 @@ import math
 import os
 
 def limpar_cena():
-    # Garante que está no modo de objeto antes de selecionar e deletar
+    # Antes de deletar, verifica se está no modo de objeto
     if bpy.ops.object.mode_set.poll():
         bpy.ops.object.mode_set(mode='OBJECT')
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-    # limpa materiais nao utilizados 
-    for material in bpy.data.materials:
-        if not material.users:
-            bpy.data.materials.remove(material)
-    for mesh in bpy.data.meshes:
-        if not mesh.users:
-            bpy.data.meshes.remove(mesh)
-    for collection in bpy.data.collections:  # Limpa colecoes vazias 
-        if not collection.objects and not collection.children:
-            pass
-    for image in bpy.data.images:
-        if not image.users: # Remove imagens nao utilizadas
-            bpy.data.images.remove(image)
-    for texture in bpy.data.textures:
-        if not texture.users: # Remove texturas nao utilizadas
-            bpy.data.textures.remove(texture)
-
+    # Remove todos os data-blocks órfãos para evitar problemas de memória
+    bpy.ops.outliner.orphans_purge()  
+            
 def criar_objeto_pai(nome, localizacao_global):
+    localizacao_global = (0, 0, 0)
+    # Cria um objeto vazio para servir como pai
     bpy.ops.object.empty_add(type='PLAIN_AXES', location=localizacao_global)
     pai = bpy.context.object
     pai.name = nome
@@ -35,20 +23,77 @@ def criar_objeto_pai(nome, localizacao_global):
 def definir_pai(objeto, pai):
     if objeto and pai:
         objeto.parent = pai
+        # Inverte a matriz de parentesco para evitar problemas de orientação
         objeto.matrix_parent_inverse = pai.matrix_world.inverted()
 
-def obter_caminho_absoluto(rel_path):
-    # Retorna o caminho absoluto a partir do diretório do script
+def mover_raiz(raiz, location):
+    raiz.location = location  
+
+def obter_caminho_absoluto(caminho_rel):
+    # Retorna o caminho absoluto a partir do diretório relativo do script 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, rel_path)
+    return os.path.join(script_dir, caminho_rel)
+
+def importar_modelo(caminho_arquivo, nome_objeto, posicao, rotacao=None, escala=None, pai=None):
+    extensao = os.path.splitext(caminho_arquivo)[1].lower()
+    
+    objeto = None  # Inicializa objeto como None
+
+    if extensao == '.obj':
+        bpy.ops.import_scene.obj(filepath=caminho_arquivo)
+        if bpy.context.selected_objects:
+            objeto = bpy.context.selected_objects[0]
+        else:
+            objeto = None
+
+    elif extensao == '.blend':
+        with bpy.data.libraries.load(caminho_arquivo, link=False) as (data_from, data_to):
+            objetos_compatíveis = []
+            # Filtra os objetos com o nome especificado 
+            for name in data_from.objects:
+                if name.startswith(nome_objeto):
+                    objetos_compatíveis.append(name)
+            data_to.objects = objetos_compatíveis
+
+        # Importa os objetos compatíveis
+        for obj in data_to.objects:
+            if obj is not None:
+                bpy.context.collection.objects.link(obj)
+                objeto = obj
+                break
+    else:
+        raise ValueError(f"Formato de arquivo {extensao} não suportado")
+
+    if not objeto:
+        raise ValueError(f"Nenhum objeto importado encontrado. O nome '{nome_objeto}' deve existir no arquivo {caminho_arquivo}")
+    
+    # Definição de posição, rotação e escala do objeto
+    if rotacao is None:
+        rotacao = (0, 0, 0)
+    if escala is None:
+        escala = (1, 1, 1)
+    if posicao is None:
+        posicao = (0, 0, 0)
+    else:
+        objeto.location = posicao
+        objeto.rotation_euler = rotacao
+        objeto.scale = escala
+    
+    if pai:
+        definir_pai(objeto, pai)
+    
+    return objeto
 
 def carregar_textura_imagem(caminho_textura, colorspace='sRGB'):
+    # Carrega uma textura e configura o espaço de cores
     if not os.path.exists(caminho_textura):
-        print(f'Arquivo {caminho_textura} não encontrado!')
-        return None
-    image = bpy.data.images.load(caminho_textura)
-    image.colorspace_settings.name = colorspace
-    return image
+        raise FileNotFoundError(f'Arquivo {caminho_textura} não encontrado!')
+    try:
+        image = bpy.data.images.load(caminho_textura)
+        image.colorspace_settings.name = colorspace
+        return image
+    except Exception as e:
+        raise Exception(f'Erro ao carregar textura: {e}') 
 
 def criar_material_base(nome):
     # Cria material base com nós principais
@@ -56,7 +101,7 @@ def criar_material_base(nome):
     material.use_nodes = True
     nodes = material.node_tree.nodes
     links = material.node_tree.links
-    nodes.clear()
+    nodes.clear() # Limpa a arvore de nodes, para evitar erros
     bsdf = nodes.new('ShaderNodeBsdfPrincipled')
     output = nodes.new('ShaderNodeOutputMaterial')
     links.new(bsdf.outputs['BSDF'], output.inputs['Surface'])
@@ -67,7 +112,12 @@ def aplicar_material(objeto, texturas=None, cor_base=None, rugosidade=1):
     material, bsdf = criar_material_base(f"Material_{objeto.name}")
 
     if texturas:
-        for input_name, (caminho, colorspace) in texturas.items():
+        # Percorre o dicionário de texturas
+        for chave, valor in texturas.items():
+            input_name = chave     
+            caminho = valor[0]     
+            colorspace = valor[1]  
+   
             tex_image = carregar_textura_imagem(caminho, colorspace)
             if tex_image:
                 tex_node = material.node_tree.nodes.new('ShaderNodeTexImage')
@@ -92,7 +142,7 @@ def aplicar_material(objeto, texturas=None, cor_base=None, rugosidade=1):
 def aplicar_material_feltro(objeto, texturas, rugosidade=1, deslocamento_escala=0.050, mapping_scale=0.100):
     # Aplica material específico para o feltro com texturas completas
     material, bsdf = criar_material_base(f"Material_Feltro_{objeto.name}")
-
+    
     # Cria as arvore de nodes e links
     nodes = material.node_tree.nodes
     links = material.node_tree.links
@@ -107,7 +157,11 @@ def aplicar_material_feltro(objeto, texturas, rugosidade=1, deslocamento_escala=
     links.new(value_node.outputs['Value'], mapping.inputs['Scale'])
     links.new(tex_coord.outputs['UV'], mapping.inputs['Vector'])
 
-    for input_name, (caminho, colorspace) in texturas.items():
+    # Percorre o dicionário de texturas
+    for chave, valor in texturas.items():
+        input_name = chave
+        caminho = valor[0]
+        colorspace = valor[1] 
         tex_image = carregar_textura_imagem(caminho, colorspace)
         
         if not tex_image:
@@ -137,15 +191,24 @@ def aplicar_material_feltro(objeto, texturas, rugosidade=1, deslocamento_escala=
         
             if output:
                 links.new(displacement_node.outputs['Displacement'], output.inputs['Displacement'])
+        
+        elif input_name == 'Height':
+            bump_node = nodes.new('ShaderNodeBump')
+            bump_node.inputs['Strength'].default_value = deslocamento_escala
+            links.new(tex_node.outputs['Color'], bump_node.inputs['Height'])
+            links.new(bump_node.outputs['Normal'], bsdf.inputs['Normal'])
+
+
 
     # Configurações padrão
     bsdf.inputs['Roughness'].default_value = rugosidade
-
+    
     # Aplicar material ao objeto
     objeto.data.materials.clear()
     objeto.data.materials.append(material)
 
 def hex_to_rgba(hex_color, alpha=None, include_alpha=True):
+    # Converte cor hexadecimal para RGBA ou RGB
     hex_color = hex_color.lstrip('#')
     r = int(hex_color[0:2], 16) / 255.0
     g = int(hex_color[2:4], 16) / 255.0
@@ -160,14 +223,14 @@ def hex_to_rgba(hex_color, alpha=None, include_alpha=True):
         return (r, g, b)
 
 def calcular_posicoes_rack(rack_x, bola_raio):
-    """Calcula as posições com formação triangular rigorosa"""
+    # Calcula as posições com formação triangular rigorosa
     espacamento = bola_raio * 2.2  # Aumentado para evitar conflitos
     posicoes = []
     
-    # Gera posições do triângulo (5 fileiras)
+    # Gera posições do triângulo 5 fileiras)
     for linha in range(5):
         qtd_bolas = linha + 1
-        offset_x = rack_x + (linha * espacamento * 0.866)
+        offset_x = rack_x + (linha * espacamento * 0.866) 
         start_y = -(qtd_bolas - 1) * (espacamento / 2)
         for bola in range(qtd_bolas):
             y_pos = start_y + (bola * espacamento)
@@ -187,7 +250,7 @@ def criar_bolas(bola_raio, mesa_comprimento, mesa_altura_total, borda_espessura)
     posicoes = calcular_posicoes_rack(rack_x, bola_raio)
     
     ordem_bolas = [
-        1,                  # Linha 1: ponta do triângulo)
+        1,                  # Linha 1: ponta do triângulo
         2, 3,               # Linha 2
         4, 8, 5,            # Linha 3: bola 8 no centro
         6, 7, 9, 10,        # Linha 4
@@ -205,13 +268,13 @@ def criar_bolas(bola_raio, mesa_comprimento, mesa_altura_total, borda_espessura)
         bola.name = f"Ball{ordem_bolas[i]}"
         # Aplica material com textura individual
         caminho_textura_bola = os.path.join(pasta_texturas_bolas, f"Ball{ordem_bolas[i]}.jpg")
-        aplicar_material(bola, texturas={'Base Color': (caminho_textura_bola, 'sRGB')}, rugosidade=0.0)
+        aplicar_material(bola, texturas={'Base Color': (caminho_textura_bola, 'sRGB')}, rugosidade=0)
         
         # Aplica suavidade em todas as bolas
         bpy.ops.object.shade_smooth()
         bolas.append(bola)
 
-    # BOLA BRANCA: lado esquerdo da mesa (posição de quebra)
+    # BOLA BRANCA: lado esquerdo da mesa 
     bola_branca_x = -mesa_comprimento/2 + borda_espessura + bola_raio * 6
     bpy.ops.mesh.primitive_uv_sphere_add(
         radius=bola_raio,
@@ -220,8 +283,7 @@ def criar_bolas(bola_raio, mesa_comprimento, mesa_altura_total, borda_espessura)
     )
     bola_branca = bpy.context.object
     bola_branca.name = "Ballcue"
-    # Corrige aplicação de suavidade
-    bpy.context.view_layer.objects.active = bola_branca
+    # aplicação de suavidade na bola branca
     bpy.ops.object.shade_smooth()
     
     # Aplica material com textura da bola branca
@@ -236,16 +298,22 @@ def criar_camera():
     bpy.ops.object.camera_add(location=(0, 0, 10), rotation=(0, 0, 0))
     camera_top = bpy.context.object
     camera_top.name = "Camera_Top"
-    # Rotação da câmera top para olhar para baixo (em radianos: X=90°)
+    # Rotação da câmera canto para olhar para baixo (em radianos: X=90°)
     camera_top.rotation_euler = (math.radians(-2.20389), 0, 0)
 
+    # Adiciona a câmera de cima2
+    bpy.ops.object.camera_add(location=(-13.177, 0.027324, 11.009))
+    camera_top2 = bpy.context.object
+    camera_top2.name = "Camera_Top2"
+    camera_top2.rotation_euler = (math.radians(51.212), math.radians(0.0017), math.radians(-89.847))
+    
     # Adiciona a câmera de canto
-    bpy.ops.object.camera_add(location=(7, -7, 6))
+    bpy.ops.object.camera_add(location=(8, -8, 8))
     camera_canto = bpy.context.object
     camera_canto.name = "Camera_Canto"
     # Rotação da câmera canto para olhar para o centro da mesa 
-    camera_canto.rotation_euler = (math.radians(60), 0, math.radians(45))
-
+    camera_canto.rotation_euler = (math.radians(60), 0, math.radians(60))
+    
 def adicionar_luz():
     # Define as cores em HEX para cada luz
     cor_luz_grande = hex_to_rgba("#ECFEFFFF", include_alpha=False)
@@ -264,8 +332,9 @@ def adicionar_luz():
     area_light_pequena.data.size = 2
     area_light_pequena.data.color = cor_luz_pequena
 
-def criar_mesa_de_sinuca(
-    nome_raiz="MesaSinuca_Raiz",
+def criar_mesa_classica(
+    nome_raiz="MesaClassica_Raiz",
+    location=(0, -5, 0),
     mesa_largura=2.0,
     mesa_comprimento=4.0,
     mesa_altura_total=1.1,
@@ -281,24 +350,10 @@ def criar_mesa_de_sinuca(
     perna_afastamento_x=0.025,
     caixa_largura=1.8,
     caixa_altura=0.33,
-    caixa_profundidade=0.3,
+    caixa_profundidade=0.33,
     largura_berco=0.13):
 
-    limpar_cena()
-    
-    # Chão
-    bpy.ops.mesh.primitive_plane_add(
-        size=15.0,
-        enter_editmode=False,
-        align='WORLD',
-        location=(0, 0, 0),
-        scale=(1, 1, 1)
-    )
-    chao = bpy.context.object
-    chao.name = "Chao_Plano"
-    # Adicionar material simples ao chão
-    aplicar_material(chao, cor_base=hex_to_rgba("#2A2A2A"), rugosidade=0.5)
-    
+
     # Feltro - área de jogo
     bpy.ops.mesh.primitive_cube_add(
         size=1, 
@@ -307,14 +362,14 @@ def criar_mesa_de_sinuca(
         scale=(mesa_comprimento, mesa_largura, mesa_espessura)
     )
     feltro = bpy.context.object
-    feltro.name = "Feltro"
+    feltro.name = "Feltro"  
     
     # Aplica material com textura ao feltro
     aplicar_material_feltro(feltro, {
-        'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', '3D_1213_C0747_W24.tif.jpg')), 'sRGB'),
-        'Roughness': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', 'divina 0106_Roughness.jpg')), 'Non-Color'),
-        'Normal': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', 'redfelt_Normal.jpg')), 'Non-Color'),
-        'Displacement': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', 'redfelt_Displacement.jpg')), 'Non-Color'),
+        'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_color_2k.jpg')), 'sRGB'),
+        'Roughness': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_roughness_2k.jpg')), 'Non-Color'),
+        'Normal': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_normal_opengl_2k.png')), 'Non-Color'),
+        'Height': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_height_2k.png')), 'Non-Color'),
     })
 
     # Berço 
@@ -334,11 +389,13 @@ def criar_mesa_de_sinuca(
         
     # Aplica material com textura azul ao berço
     aplicar_material_feltro(berco, {
-        'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', '3D_1213_C0747_W24.tif.jpg')), 'sRGB'),
-        'Roughness': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', 'divina 0106_Roughness.jpg')), 'Non-Color'),
-        'Normal': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', 'redfelt_Normal.jpg')), 'Non-Color'),
-        'Displacement': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_azul', 'redfelt_Displacement.jpg')), 'Non-Color'),
+        'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_color_2k.jpg')), 'sRGB'),
+        'Roughness': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_roughness_2k.jpg')), 'Non-Color'),
+        'Normal': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_normal_directx_2k.png')), 'Non-Color'),
+        'Height': (obter_caminho_absoluto(os.path.join('..', 'assets', 'feltro_verde', 'fabrics_0075_height_2k.png')), 'Non-Color'),
     })
+
+
 
     # Recorte central pra encaixar o feltro 
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, berco_z))
@@ -360,18 +417,11 @@ def criar_mesa_de_sinuca(
     borda = bpy.context.object
     borda.name = "Borda"
     borda.scale = (mesa_comprimento + 2 * borda_espessura, mesa_largura + 2 * borda_espessura, borda_altura)
-    
-    # Modificador Bevel
-    bevel = borda.modifiers.new(name="Bevel", type='BEVEL')
-    bevel.width = 0.10
-    bevel.segments = 5
-    bevel.profile = 0.7
-    bevel.limit_method = 'ANGLE'
-    bevel.affect = 'EDGES'
 
     # Aplica material com base cor branca
-    aplicar_material(borda, cor_base=hex_to_rgba("#e7e7e7"))
-
+    aplicar_material_feltro(borda,{
+        'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'madeira', 'madeira2.jpg')), 'sRGB'),
+        })
 
     # Recorte do centro - para encaixar o feltro
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total))
@@ -385,6 +435,28 @@ def criar_mesa_de_sinuca(
     bpy.ops.object.modifier_apply(modifier="Boolean")
     bpy.data.objects.remove(corte)
 
+    # Tacos de sinuca
+    tacos = []
+
+    taco1 = importar_modelo(
+        obter_caminho_absoluto(os.path.join('..', 'assets', 'modelos', 'pool-cue.blend')),
+        "Pool Cue",
+        posicao=(-0.64913, -0.48451, 1.1),
+        rotacao=(0, 0, math.radians(358.71)),
+        escala=(1.966, 1.966, 1.966)
+    )
+
+    taco2 = importar_modelo(
+        obter_caminho_absoluto(os.path.join('..', 'assets', 'modelos', 'pool-cue.blend')),
+        "Pool Cue",
+        posicao=(-0.647414, 0.-0.584524, 1.1),
+        rotacao=(0, 0, math.radians(358.71)),
+        escala=(1.966, 1.966, 1.966)
+    )
+
+    tacos.append(taco1)
+    tacos.append(taco2)
+    
     # Base
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, mesa_altura_total - mesa_espessura - base_espessura / 2))
     base = bpy.context.object
@@ -392,8 +464,9 @@ def criar_mesa_de_sinuca(
     base.name = "Base_Mesa"
     
     # Aplica material com cor à base
-    aplicar_material(base, cor_base=hex_to_rgba("#e7e7e7"))
-    
+    aplicar_material_feltro(base,{
+        'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'madeira', 'madeira2.jpg')), 'sRGB'),
+    })
     # Mesa coletora
     caixa_x = 0
     caixa_y = -(mesa_largura/2 + caixa_profundidade/2 - 0.01)
@@ -405,7 +478,8 @@ def criar_mesa_de_sinuca(
     caixa = bpy.context.object
     caixa.name = "Caixa_Coletora"
     caixa.scale = (caixa_largura/2, caixa_profundidade/2, caixa_altura/2)
-    aplicar_material(caixa, cor_base=hex_to_rgba("#838383"))
+    aplicar_material(caixa, cor_base=hex_to_rgba("#A07A43FF", include_alpha=True))
+
 
     # Caçapas
     offset = 0.07
@@ -422,14 +496,14 @@ def criar_mesa_de_sinuca(
         # Cilindro interno da caçapa
         bpy.ops.mesh.primitive_cylinder_add(
             radius=cacapa_raio - 0.001,
-            depth=borda_altura - mesa_espessura + 0.01,
+            depth=borda_altura - mesa_espessura + 0.05,
             location=(pos[0], pos[1], pos[2] - mesa_espessura)
         )
         interior_cacapa = bpy.context.object
         interior_cacapa.name = f"Interior_Cacapa_{i}"
         aplicar_material(interior_cacapa, cor_base=hex_to_rgba('#000000'))
         cacapas.append(interior_cacapa)
-
+        
         # Cilindro para recorte (boolean)
         bpy.ops.mesh.primitive_cylinder_add(
             radius=cacapa_raio,
@@ -480,14 +554,19 @@ def criar_mesa_de_sinuca(
         perna = bpy.context.object
         perna.scale = (perna_tamanho, perna_tamanho, perna_altura)
         perna.name = f"Perna_{i}"
-        aplicar_material(perna, cor_base=hex_to_rgba("#e7e7e7"))
+        aplicar_material_feltro(perna, {
+            'Base Color': (obter_caminho_absoluto(os.path.join('..', 'assets', 'madeira', 'madeira2.jpg')), 'sRGB'),
+        })
         pernas.append(perna)
 
-    # Criar raiz principal e subgrupos
-    raiz = criar_objeto_pai(nome_raiz, (0, 0, 0))
-    bolas_grupo = criar_objeto_pai("Bolas_Grupo", (0, 0, 0))
-    pernas_grupo = criar_objeto_pai("Pernas_Grupo", (0, 0, 0))
-    cacapas_grupo = criar_objeto_pai("Cacapas_Grupo", (0, 0, 0))
+   # Criar raiz e subgrupos
+    raiz = criar_objeto_pai(nome_raiz, location)
+    grupos = {
+        "Bolas": criar_objeto_pai("Bolas_Grupo", (0, 0, 0)),
+        "Pernas": criar_objeto_pai("Pernas_Grupo", (0, 0, 0)),
+        "Cacapas": criar_objeto_pai("Cacapas_Grupo", (0, 0, 0)),
+        "Tacos": criar_objeto_pai("Tacos_Grupo", (0, 0, 0))
+    }
 
     # Lista de objetos
     objetos_principais = {
@@ -495,25 +574,25 @@ def criar_mesa_de_sinuca(
         "Bolas": bolas,
         "Pernas": pernas,
         "Cacapas": cacapas,
+        "Tacos": tacos
     }
 
-    # Parentear objetos aos subgrupos
-    for obj in objetos_principais["Mesa"]:
-        definir_pai(obj, raiz)
-    for obj in objetos_principais["Bolas"]:
-        definir_pai(obj, bolas_grupo)
-    for obj in objetos_principais["Pernas"]:
-        definir_pai(obj, pernas_grupo)
-    for obj in objetos_principais["Cacapas"]:
-        definir_pai(obj, cacapas_grupo)
-    
-    # Parentear subgrupos à raiz
-    definir_pai(bolas_grupo, raiz)
-    definir_pai(pernas_grupo, raiz)
-    definir_pai(cacapas_grupo, raiz)
+    # Parentear objetos aos subgrupos e subgrupos à raiz
+    for grupo_nome in objetos_principais:
+        if grupo_nome == "Mesa":
+            grupo_pai = raiz
+        else:
+            grupo_pai = grupos[grupo_nome]
+            definir_pai(grupo_pai, raiz)
+        for obj in objetos_principais[grupo_nome]:
+            definir_pai(obj, grupo_pai)
 
+    mover_raiz(raiz, location)
 
 if __name__ == "__main__":
-    criar_mesa_de_sinuca()
+    limpar_cena()
+    criar_mesa_classica()
     criar_camera()
     adicionar_luz()
+
+    
