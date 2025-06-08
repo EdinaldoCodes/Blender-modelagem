@@ -6,3 +6,5 @@ Este projeto foi desenvolvido como parte da disciplina de Computação Gráfica,
 ![modelo_branco6png](https://github.com/user-attachments/assets/9011c1fa-3747-4541-9506-3c19266af492)
 
 ![modelo_branco7](https://github.com/user-attachments/assets/f9554ee6-c4e1-4910-83a5-50cb31e19d24)
+
+![3mesas_camera1](https://github.com/user-attachments/assets/0ac007e4-bae5-4b3e-b2ed-fcca58166c03)
